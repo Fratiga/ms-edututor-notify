@@ -31,6 +31,14 @@ public class RabbitConfig {
 		factory.setConnectionFactory(connectionFactory);
 		factory.setMessageConverter(jsonMessageConverter);
 		factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
+		// Una sola entrega pendiente por consumidor: reparto justo y un fallo no
+		// deja varios mensajes sin confirmar. Escala hasta 3 consumidores por cola.
+		factory.setPrefetchCount(1);
+		factory.setConcurrentConsumers(1);
+		factory.setMaxConcurrentConsumers(3);
+		// Si las colas todavía no existen (topología sin declarar), reintenta en
+		// vez de tumbar el arranque; este factory no hereda spring.rabbitmq.listener.*.
+		factory.setMissingQueuesFatal(false);
 		return factory;
 	}
 }
