@@ -4,45 +4,25 @@ import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 import com.rabbitmq.client.Channel;
 
+// Lógica común de los consumidores: idempotencia, ACK manual y decisión entre
+// reintento y DLQ. Cada listener (por dominio) solo recibe el mensaje y llama
+// a procesar().
 @Component
-public class NotifyListener {
+public class ComandoProcesador {
 
-	private static final Logger log = LoggerFactory.getLogger(NotifyListener.class);
+	private static final Logger log = LoggerFactory.getLogger(ComandoProcesador.class);
 
 	private final EventosProcesadosStore eventosProcesados;
 
-	public NotifyListener(EventosProcesadosStore eventosProcesados) {
+	public ComandoProcesador(EventosProcesadosStore eventosProcesados) {
 		this.eventosProcesados = eventosProcesados;
 	}
 
-	@RabbitListener(queues = "q.cmd.email")
-	public void onEmail(@Payload ComandoEnvelope evento, Channel channel,
-			@Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
-		procesar(evento, channel, tag, "email/push al estudiante");
-	}
-
-	@RabbitListener(queues = "q.cmd.session")
-	public void onSessionTicket(@Payload ComandoEnvelope evento, Channel channel,
-			@Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
-		procesar(evento, channel, tag, "ticket de sesión al tutor");
-	}
-
-	@RabbitListener(queues = "q.cmd.certificate")
-	public void onCertificate(@Payload ComandoEnvelope evento, Channel channel,
-			@Header(AmqpHeaders.DELIVERY_TAG) long tag) throws IOException {
-		procesar(evento, channel, tag, "generación de certificado/constancia");
-	}
-
-	private void procesar(ComandoEnvelope evento, Channel channel, long tag, String descripcion) throws IOException {
+	public void procesar(ComandoEnvelope evento, Channel channel, long tag, String descripcion) throws IOException {
 		if (!eventosProcesados.marcarSiEsNuevo(evento.eventId())) {
 			// Reentrega de un evento ya procesado (semántica at-least-once):
 			// confirmamos sin repetir el efecto.
